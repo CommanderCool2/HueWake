@@ -3,6 +3,8 @@
  * Button has an icon and a lable.
  */
 
+ //added acomment
+
 import React, { Component } from 'react';
 import {
  	Text,
