@@ -81,4 +81,4 @@ var styles = StyleSheet.create({
   },
 });
 
-AppRegistry.registerComponent('AwesomeProject2', () => HueWake);
+AppRegistry.registerComponent('HueWake', () => HueWake);
