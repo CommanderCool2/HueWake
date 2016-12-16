@@ -44,13 +44,32 @@ export default class WakeUpLight extends Component {
 	constructor(props) {
 	    super(props);
 	    this.state = {
-			WakeUpTimeHour: 6,
-			WakeUpTimeMinute: 15,
-			RoutineRunning: false,
-      RoutineTimerID: 0,
-      SunIsOnTheRise: false,
+			WakeUpTimeHours: 6,
+			WakeUpTimeMinutes: 15,
+      scheduleIsOn: false
 		};
   }
+
+  componentDidMount() {
+    fetch('http://192.168.0.21/api/CeyiFspaKI7cxGvtu9uOLJmQgOmAZuoUyMaxwETp/schedules/4')
+      .then((response) => response.json())
+      .then((responseJson) => {
+        //Alert.alert('Innerhalb fetch(): ' + responseJson.status);
+        //data = JSON.stringify(responseJson.movies[0]).substring(10,19);
+        if(responseJson.status == "enabled") {
+          this.setState({scheduleIsOn: true});
+        }
+        let hours = parseInt(responseJson.localtime.substring(6,8));
+        let minutes = parseInt(responseJson.localtime.substring(9,11));
+        //Alert.alert(hours + ":" + minutes);
+        this.setState({WakeUpTimeHours: hours});
+        this.setState({WakeUpTimeMinutes: minutes});
+      })
+      .catch((error) => {
+        console.error(error);
+      });
+  };
+
 	/**
 	 * Starts an Android time picker.
 	 */
@@ -60,8 +79,8 @@ export default class WakeUpLight extends Component {
 	      var newState = {};
 	      if (action === TimePickerAndroid.timeSetAction) {
 	        //newState[stateKey + 'Text'] = _formatTime(hour, minute);
-	        this.setState({WakeUpTimeHour: hour});
-	        this.setState({WakeUpTimeMinute: minute});
+	        this.setState({WakeUpTimeHours: hour});
+	        this.setState({WakeUpTimeMinutes: minute});
 	      } else if (action === TimePickerAndroid.dismissedAction) {
 	        newState[stateKey + 'Text'] = 'dismissed';
 	      }
@@ -77,137 +96,7 @@ export default class WakeUpLight extends Component {
 	 */
 	formatTime(hour, minute) {
 	  return hour + ':' + (minute < 10 ? '0' + minute : minute);
-	}
-
-  /**
-   * Called when start/stop button is pressed.
-   * Sets RoutineRunning sate and starts/stops the routine.
-   */
-	onStartButtonPress() {
-		//Alert.alert("Button pressed.");
-		if(this.state.RoutineRunning == false) {
-      this.startRoutine();
-		} else if(this.state.RoutineRunning == true) {
-      this.stopRoutine();
-		} else {
-			Alert.alert("this.state.RoutineRunning was not initialized correctly");
-		}
-	}
-
-  /**
-   * Starts the routine which waits until the set up wake up time is reached,
-   * then starts the sunrise.
-   */
-  startRoutine() {
-
-    /**
-     * Set the global routine var to true.
-     */
-    this.setState({RoutineRunning: true});
-
-    /**
-     * Current time in Date format.
-     */
-    let currentTime = new Date();
-
-    /**
-     * Number of milliseconds since January 1, 1970 00:00:00 UTC.
-     */
-  	let currentTimeInMsSince1970 = Date.now();
-
-    /**
-     * Difference between the current time and the wake up time in miliseconds.
-     */
-    let offsetInMs = 0;
-
-    /**
-     * Minutes before the wake up time the sunrise starts.
-     */
-    let MinutesBeforeWakeUpTimeTheSunriseStarts = 7;
-
-    /**
-     * Alarm time in date format.
-     */
-    let alarmTime = new Date();
-
-    /**
-     * Sets the seconds and milliseconds of the alarm to 0 that it goas off
-     * exactly at the time set up.
-     */
-    alarmTime.setSeconds(0);
-    alarmTime.setMilliseconds(0);
-
-    /**
-     * Sets the minutes and hours of the alarm to the set up values.
-     */
-    alarmTime.setHours(this.state.WakeUpTimeHour);
-    alarmTime.setMinutes(this.state.WakeUpTimeMinute);
-
-    /**
-     * Sets the day of the alarm time to tomorrow, if the set up time is tomorrow.
-     */
-    if (currentTime.getHours() > this.state.WakeUpTimeHour || (currentTime.getHours() == this.state.WakeUpTimeHour && currentTime.getMinutes() > this.state.WakeUpTimeMinute)) {
-      alarmTime.setDate(currentTime.getDate() + 1);
-    }
-
-    /**
-     * Sets the offset between the current time and the alarm time.
-     */
-    offsetInMs =  alarmTime.getTime() - currentTimeInMsSince1970;
-    //TODO: handling when offset = 0 or negative
-
-
-    offsetInMs - MinutesBeforeWakeUpTimeTheSunriseStarts * 1000;
-    /**
-     * Starts the timeout until the sunrine begins and sets the timer id
-     * so that this timeout can be canceled.
-     */
-    let tmp = setTimeout(
-		    () => { this.startSunrise(0, 10778, 251, 30); },
-			offsetInMs
-		);
-
-    this.setState({RoutineTimerID: tmp});
-  }
-
-  /**
-   * Stops the routine.
-   */
-  stopRoutine() {
-    this.setState({RoutineRunning: false});
-    clearTimeout(this.state.RoutineTimerID);
-    this.stopSunrise();
-  }
-
-  /**
-   * Starts the sunrise. Therefore, REST calls make the lights slowly brigther.
-   * From bri: 0, hue: 10778, sat: 251, ct: 500
-   * To bri: 254, hue: 14957, sat: 141, ct: 365
-   * Steps: 254
-   */
-  startSunrise(bri, hue, sat, sunriseDurationInMinutes) {
-    //TODO: the handling of the variables bri, sat and hue has to be cleaned up
-    // The aim should be dynamically generated steps
-
-
-    //Increase bri by 1
-    bri++;
-
-    //Increase hue by 16,45 and round it to an integer
-    let tmpHue = hue + 16.45;
-    hue = Math.round(tmpHue);
-
-    //Decrease sat by 0,44 and round it to an integer
-    let tmpSat = sat - 0.44;
-    sat = Math.round(tmpSat);
-
-    //TODO: if-Abfrage um die limits der Werte bri, hue und sat erweitern
-    if(this.state.RoutineRunning == true && 0 <= bri < 255) {
-      this.setLight(1, true, bri, hue, sat);
-      this.setLight(3, true, bri, hue, sat);
-      setTimeout(() => {this.startSunrise(bri, tmpHue, tmpSat, sunriseDurationInMinutes)}, Math.round(sunriseDurationInMinutes*60*1000/254));
-    }
-  }
+	};
 
   /**
    * Sets the values of a specific light.
@@ -216,12 +105,12 @@ export default class WakeUpLight extends Component {
    * bri  brightness of the light, number between 0 and 254
    * hue  hue of the light, number between 0 and 65280
    * sat  saturation of the light, number between 0 and 254
-   */
+   *
   setLight(id, on, bri, hue, sat) {
 
       /**
        * REST call to put a body with the values to set up.
-       */
+       *
       fetch('http://192.168.0.21/api/CeyiFspaKI7cxGvtu9uOLJmQgOmAZuoUyMaxwETp/lights/' + id + '/state', {
         method: 'PUT',
         headers: {
@@ -235,16 +124,68 @@ export default class WakeUpLight extends Component {
           'sat': sat,
         })
       });
+  }*/
+
+  /**
+   * This function is called every time the state of this component (WakeUpLight) is changed
+   */
+  componentDidUpdate(prevProps, prevState) {
+    /**
+     * If the switch is used
+     */
+    if(prevState.scheduleIsOn != this.state.scheduleIsOn) {
+      this.setScheduleStatus(4); // TODO: id=4 is set hard in the code. This has to be changed in the future
+    }
+
+    else if(prevState.WakeUpTimeHours != this.state.WakeUpTimeHours || prevState.WakeUpTimeMinutes != this.state.WakeUpTimeMinutes) {
+      this.setScheduleTime(4); // TODO: id=4 is set hard in the code. This has to be changed in the future
+    }
   }
 
   /**
-   * Stops the sunrise and turns off the lights.
+   * Sets the status of a specific schedule.
+   * id   id of the specific schedule which should be set up
    */
-  stopSunrise() {
-    this.setLight(1, false, 254, 14957, 141);
-    this.setLight(3, false, 254, 14957, 141);
-    //TODO build own function just to turn off the on property
-  }
+  setScheduleStatus(id) {
+
+    let statusToSet = this.state.scheduleIsOn ? 'enabled' : 'disabled';
+
+    /**
+     * REST call to change the status of a schedule to enabled/disabled.
+     */
+    fetch('http://192.168.0.21/api/CeyiFspaKI7cxGvtu9uOLJmQgOmAZuoUyMaxwETp/schedules/' + id, {
+      method: 'PUT',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        'status': statusToSet
+      })
+    });
+  };
+
+  /**
+   * Sets the time of a specific schedule.
+   * id   id of the specific schedule which should be set up
+   */
+  setScheduleTime(id) {
+
+    let time = "W124/T" + (this.state.WakeUpTimeHours < 10 ? "0" + this.state.WakeUpTimeHours : this.state.WakeUpTimeHours) + ":" + (this.state.WakeUpTimeMinutes < 10 ? "0" + this.state.WakeUpTimeMinutes : this.state.WakeUpTimeMinutes) + ":00";
+    /**
+     * REST call to change the status of a schedule to enabled/disabled.
+     */
+    fetch('http://192.168.0.21/api/CeyiFspaKI7cxGvtu9uOLJmQgOmAZuoUyMaxwETp/schedules/' + id, {
+      method: 'PUT',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        'localtime': time
+      })
+    });
+  };
 
 	/**
 	 * Renders the UI components.
@@ -256,22 +197,6 @@ export default class WakeUpLight extends Component {
 	 */
 	render() {
 
-	//This block handles the appearance of the button
-	let buttonText = '';
-	let buttonIcon = null;
-	let buttonStyle = null;
-	if(this.state.RoutineRunning == false) {
-		buttonText = 'Start';
-		buttonIcon = require('./images/Icon-Bed-Sleep.png');
-		buttonStyle = styles.buttonStart;
-	} else if(this.state.RoutineRunning == true) {
-		buttonText = 'Stop';
-		buttonIcon = require('./images/Icon-Bed-WakeUp.png');
-		buttonStyle = styles.buttonStop;
-	} else {
-		Alert.alert("this.state.RoutineRunning was not initialized correctly");
-	}
-
     return (
 		<View style={styles.container}>
 
@@ -279,18 +204,24 @@ export default class WakeUpLight extends Component {
 
 			<TouchableWithoutFeedback
 				onPress={this.showPicker.bind(this, 'isoFormat', {
-				hour: this.state.WakeUpTimeHour,
-				minute: this.state.WakeUpTimeMinute,
+				hour: this.state.WakeUpTimeHours,
+				minute: this.state.WakeUpTimeMinutes,
 				is24Hour: true,
 			})}>
 				<View>
-					<Text style={styles.textL}>{this.formatTime(this.state.WakeUpTimeHour, this.state.WakeUpTimeMinute)}</Text>
+					<Text style={styles.textL}>{this.formatTime(this.state.WakeUpTimeHours, this.state.WakeUpTimeMinutes)}</Text>
 				</View>
 			</TouchableWithoutFeedback>
 
-			<View style={{height: 40}}></View>
+      <View style={{height: 20}}></View>
 
-			<MyButton icon={buttonIcon} label={buttonText} onPressFunction={() => this.onStartButtonPress()} style={buttonStyle} />
+      <Text style={styles.textS}>Sunrise</Text>
+
+      <View style={{height: 5}}></View>
+
+      <Switch
+          onValueChange={(value) => this.setState({scheduleIsOn: value})}
+          value={this.state.scheduleIsOn} />
 
 		</View>
     );
@@ -327,29 +258,5 @@ const styles = StyleSheet.create({
 	textS: {
     fontSize: 15,
 		color: '#bababf',
-	},
-	buttonStart: {
-		width: 150,
-		height: 48,
-		backgroundColor: '#3a802d',
-		justifyContent: 'center', //vertical
-		alignItems: 'center', //horizontal
-		flexDirection: 'row',
-    elevation: 6,
-	},
-	buttonStop: {
-		width: 150,
-		height: 48,
-		backgroundColor: '#802d2d',
-		justifyContent: 'center', //vertical
-		alignItems: 'center', //horizontal
-		flexDirection: 'row',
-    elevation: 6,
-	},
-	buttonIcon: {
-		width: 32,
-		height: 32,
-		marginRight: 0,
-    marginLeft: 8,
 	},
 });
