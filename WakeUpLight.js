@@ -1,6 +1,9 @@
 /**
  * Wake up light.
  */
+'use strict';
+
+let sunriseDurationBeforeWakeUp = 10;
 
 import React, { Component } from 'react';
 import {
@@ -62,6 +65,14 @@ export default class WakeUpLight extends Component {
         let hours = parseInt(responseJson.localtime.substring(6,8));
         let minutes = parseInt(responseJson.localtime.substring(9,11));
         //Alert.alert(hours + ":" + minutes);
+        if(minutes >= 50) {
+          hours += 1;
+          minutes = minutes + sunriseDurationBeforeWakeUp - 60;
+        }
+        else {
+          minutes += 10;
+        }
+
         this.setState({WakeUpTimeHours: hours});
         this.setState({WakeUpTimeMinutes: minutes});
       })
@@ -171,7 +182,18 @@ export default class WakeUpLight extends Component {
    */
   setScheduleTime(id) {
 
-    let time = "W124/T" + (this.state.WakeUpTimeHours < 10 ? "0" + this.state.WakeUpTimeHours : this.state.WakeUpTimeHours) + ":" + (this.state.WakeUpTimeMinutes < 10 ? "0" + this.state.WakeUpTimeMinutes : this.state.WakeUpTimeMinutes) + ":00";
+    let minutes = this.state.WakeUpTimeMinutes;
+    let hours = this.state.WakeUpTimeHours;
+
+    if(minutes > sunriseDurationBeforeWakeUp) {
+      minutes = minutes - sunriseDurationBeforeWakeUp;
+    }
+    else {
+      minutes = 60 + minutes - sunriseDurationBeforeWakeUp;
+      hours == 0 ? hours = 23 : hours -= 1; 
+    }
+
+    let time = "W124/T" + (hours < 10 ? "0" + hours : hours) + ":" + (minutes < 10 ? "0" + minutes : minutes) + ":00";
     /**
      * REST call to change the status of a schedule to enabled/disabled.
      */
