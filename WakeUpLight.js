@@ -3,8 +3,6 @@
  */
 'use strict';
 
-let sunriseDurationBeforeWakeUp = 10;
-
 import React, { Component } from 'react';
 import {
  	StyleSheet,
@@ -17,9 +15,12 @@ import {
 	TouchableOpacity,
 	Switch,
 	TimePickerAndroid,
-  AppState
+  AppState,
+  TextInput,
+  Picker
 } from 'react-native';
 
+//import NumberPicker from './NumberPicker';
 
 //import MyButton from './MyButton';
 class MyButton extends Component {
@@ -48,8 +49,9 @@ export default class WakeUpLight extends Component {
 	    super(props);
 	    this.state = {
 			WakeUpTimeHours: 6,
-			WakeUpTimeMinutes: 15,
-      scheduleIsOn: false
+			WakeUpTimeMinutes: 5,
+      scheduleIsOn: false,
+      sunriseDurationBeforeWakeUp: 15
 		};
   }
 
@@ -65,12 +67,12 @@ export default class WakeUpLight extends Component {
         let hours = parseInt(responseJson.localtime.substring(6,8));
         let minutes = parseInt(responseJson.localtime.substring(9,11));
         //Alert.alert(hours + ":" + minutes);
-        if(minutes >= 50) {
+        if(minutes >= 60-this.state.sunriseDurationBeforeWakeUp) {
           hours += 1;
-          minutes = minutes + sunriseDurationBeforeWakeUp - 60;
+          minutes = minutes + this.state.sunriseDurationBeforeWakeUp - 60;
         }
         else {
-          minutes += 10;
+          minutes += this.state.sunriseDurationBeforeWakeUp;
         }
 
         this.setState({WakeUpTimeHours: hours});
@@ -151,6 +153,11 @@ export default class WakeUpLight extends Component {
     else if(prevState.WakeUpTimeHours != this.state.WakeUpTimeHours || prevState.WakeUpTimeMinutes != this.state.WakeUpTimeMinutes) {
       this.setScheduleTime(4); // TODO: id=4 is set hard in the code. This has to be changed in the future
     }
+
+    else if(prevState.sunriseDurationBeforeWakeUp != this.state.sunriseDurationBeforeWakeUp) {
+      //Alert.alert("sunriseDurationBeforeWakeUp has changed, is now: " + this.state.sunriseDurationBeforeWakeUp);
+      this.setScheduleTime(4); // TODO: id=4 is set hard in the code. This has to be changed in the future
+    }
   }
 
   /**
@@ -185,12 +192,12 @@ export default class WakeUpLight extends Component {
     let minutes = this.state.WakeUpTimeMinutes;
     let hours = this.state.WakeUpTimeHours;
 
-    if(minutes > sunriseDurationBeforeWakeUp) {
-      minutes = minutes - sunriseDurationBeforeWakeUp;
+    if(minutes > this.state.sunriseDurationBeforeWakeUp) {
+      minutes = minutes - this.state.sunriseDurationBeforeWakeUp;
     }
     else {
-      minutes = 60 + minutes - sunriseDurationBeforeWakeUp;
-      hours == 0 ? hours = 23 : hours -= 1; 
+      minutes = 60 + minutes - this.state.sunriseDurationBeforeWakeUp;
+      hours == 0 ? hours = 23 : hours -= 1;
     }
 
     let time = "W124/T" + (hours < 10 ? "0" + hours : hours) + ":" + (minutes < 10 ? "0" + minutes : minutes) + ":00";
@@ -209,6 +216,9 @@ export default class WakeUpLight extends Component {
     });
   };
 
+
+
+
 	/**
 	 * Renders the UI components.
 	 * Returns the same result each time it's invoked,
@@ -221,6 +231,8 @@ export default class WakeUpLight extends Component {
 
     return (
 		<View style={styles.container}>
+
+    <View style={{height: 50}}></View>
 
 			<Text style={styles.textS}>Time you want to wake up</Text>
 
@@ -235,7 +247,7 @@ export default class WakeUpLight extends Component {
 				</View>
 			</TouchableWithoutFeedback>
 
-      <View style={{height: 20}}></View>
+      <View style={{height: 150}}></View>
 
       <Text style={styles.textS}>Sunrise</Text>
 
@@ -244,6 +256,24 @@ export default class WakeUpLight extends Component {
       <Switch
           onValueChange={(value) => this.setState({scheduleIsOn: value})}
           value={this.state.scheduleIsOn} />
+
+      <View style={{height: 20}}></View>
+
+      <Text style={styles.textS}>Minutes sunrise starts before you want to wake up</Text>
+
+          <Picker
+              style={styles.picker}
+              selectedValue={this.state.sunriseDurationBeforeWakeUp.toString()}
+              onValueChange={(value) => this.setState({sunriseDurationBeforeWakeUp: parseInt(value)})}
+          >
+              <Picker.Item label="0" value="0" />
+              <Picker.Item label="5" value="5" />
+              <Picker.Item label="10" value="10" />
+              <Picker.Item label="15" value="15" />
+              <Picker.Item label="20" value="20" />
+              <Picker.Item label="25" value="25" />
+              <Picker.Item label="30" value="30" />
+          </Picker>
 
 		</View>
     );
@@ -281,4 +311,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
 		color: '#bababf',
 	},
+  picker: {
+    width: 70,
+    color: '#f8f8ff',
+  },
 });
