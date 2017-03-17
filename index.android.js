@@ -1,83 +1,393 @@
 /**
- * App class
- * Contains the navigator.
- * Holds everything together and cares about the navigation
- * trough different scenes.
+ * Wake up light.
  */
+'use strict';
 
 import React, { Component } from 'react';
 import {
-	AppRegistry,
-	StyleSheet,
-	Text,
+  AppRegistry,
+ 	StyleSheet,
+ 	Text,
+ 	Image,
 	View,
-	Navigator,
+	Alert,
+	TouchableHighlight,
+	TouchableWithoutFeedback,
 	TouchableOpacity,
+	Switch,
+	TimePickerAndroid,
+  AppState,
+  TextInput,
+  Picker,
+	DrawerLayoutAndroid,
 } from 'react-native';
 
-import WakeUpLight from './WakeUpLight';
-import NoNavigatorScene from './NoNavigatorScene';
+//import NumberPicker from './NumberPicker';
 
-class HueWake extends Component {
-  render() {
-    return (
-      <Navigator
-          initialRoute={{id: 'WakeUpLight', name: 'Index'}}
-          renderScene={this.renderScene.bind(this)}
-          configureScene={(route) => {
-            if (route.sceneConfig) {
-              return route.sceneConfig;
-            }
-            return Navigator.SceneConfigs.FloatFromRight;
-          }} />
-    );
-  }
+//import MyButton from './MyButton';
+class MyButton extends Component {
 
-  renderScene(route, navigator) {
-    let routeId = route.id;
-    if (routeId === 'WakeUpLight') {
-      return (
-        <WakeUpLight
-          navigator={navigator} />
-      );
-    }
-    if (routeId === 'NoNavigatorScene') {
-      return (
-        <NoNavigatorScene
-            navigator={navigator} />
-      );
-    }
-    return this.noRoute(navigator);
+	constructor(props) {
+		super(props);
+	}
 
-  }
-  noRoute(navigator) {
-    return (
-      <View style={{flex: 1, alignItems: 'stretch', justifyContent: 'center'}}>
-        <TouchableOpacity style={{flex: 1, alignItems: 'center', justifyContent: 'center'}}
-            onPress={() => navigator.pop()}>
-          <Text style={{color: 'red', fontWeight: 'bold'}}>Configure the Route in index.android.js in the renderScene</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+	render() {
+		return (
+			<TouchableOpacity onPress={this.props.onPressFunction} style={this.props.style}>
+					<Image style={styles.buttonIcon} source={this.props.icon} />
+					<Text style={styles.textM}>{this.props.label}</Text>
+			</TouchableOpacity>
+		);
+	}
 }
 
-var styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F5FCFF',
-  },
-  welcome: {
-    fontSize: 20,
-    textAlign: 'center',
-    margin: 10,
-  },
-  instructions: {
-    textAlign: 'center',
-    color: '#333333',
-    marginBottom: 5,
+
+export default class HueWake extends Component {
+
+	/**
+	 * Initializes all states with default
+	 */
+	constructor(props) {
+	    super(props);
+	    this.state = {
+			WakeUpTimeHours: 6,
+			WakeUpTimeMinutes: 5,
+      scheduleIsOn: false,
+      sunriseDurationBeforeWakeUp: 15,
+			sunriseDurationMinutes: 30
+		};
+  }
+
+	/**
+	 * Initializes state values
+	 * Gets data from hue bridge to set up states (WakeUpTimeHours, WakeUpTimeMinutes, scheduleIsOn)
+	 */
+  componentDidMount() {
+
+		// Get data from schedule (time, schedule status)
+    fetch('http://192.168.0.21/api/CeyiFspaKI7cxGvtu9uOLJmQgOmAZuoUyMaxwETp/schedules/4')
+      .then((response) => response.json())
+      .then((responseJson) => {
+
+        if(responseJson.status == "enabled") {
+          this.setState({scheduleIsOn: true});
+        }
+        let hours = parseInt(responseJson.localtime.substring(6,8));
+        let minutes = parseInt(responseJson.localtime.substring(9,11));
+        if(minutes >= 60-this.state.sunriseDurationBeforeWakeUp) {
+          hours += 1;
+          minutes = minutes + this.state.sunriseDurationBeforeWakeUp - 60;
+        }
+        else {
+          minutes += this.state.sunriseDurationBeforeWakeUp;
+        }
+
+        this.setState({WakeUpTimeHours: hours});
+        this.setState({WakeUpTimeMinutes: minutes});
+      })
+      .catch((error) => {
+        console.error(error);
+      });
+
+			// Get data from rulse (sun rise length)
+	    fetch('http://192.168.0.21/api/CeyiFspaKI7cxGvtu9uOLJmQgOmAZuoUyMaxwETp/rules/5')
+	      .then((response) => response.json())
+	      .then((responseJson) => {
+
+					let time = responseJson.actions[0].body.transitiontime;
+
+					// This must be done because the time on the hue bridge is saved in milliseconds * 10
+					time /= 600;
+
+	        this.setState({sunriseDurationMinutes: time});
+	      })
+	      .catch((error) => {
+	        console.error(error);
+	      });
+  };
+
+	/**
+	 * Starts an Android time picker.
+	 */
+	showPicker = async (stateKey, options) => {
+	    try {
+	      const {action, minute, hour} = await TimePickerAndroid.open(options);
+	      var newState = {};
+	      if (action === TimePickerAndroid.timeSetAction) {
+	        //newState[stateKey + 'Text'] = _formatTime(hour, minute);
+	        this.setState({WakeUpTimeHours: hour});
+	        this.setState({WakeUpTimeMinutes: minute});
+	      } else if (action === TimePickerAndroid.dismissedAction) {
+	        newState[stateKey + 'Text'] = 'dismissed';
+	      }
+	      this.setState(newState);
+	    } catch ({code, message}) {
+	      console.warn(`Error in example '${stateKey}': `, message);
+	    }
+	};
+
+
+	/**
+	 * Returns e.g. '3:05'.
+	 */
+	formatTime(hour, minute) {
+	  return hour + ':' + (minute < 10 ? '0' + minute : minute);
+	};
+
+  /**
+   * This function is called every time the state of this component (WakeUpLight) is changed
+   */
+  componentDidUpdate(prevProps, prevState) {
+    // If the switch is used
+    if(prevState.scheduleIsOn != this.state.scheduleIsOn) {
+      this.setScheduleStatus(4); // TODO: id=4 is set hard in the code. This has to be changed in the future
+    }
+		// If time is set up
+    else if(prevState.WakeUpTimeHours != this.state.WakeUpTimeHours || prevState.WakeUpTimeMinutes != this.state.WakeUpTimeMinutes) {
+      this.setScheduleTime(4); // TODO: id=4 is set hard in the code. This has to be changed in the future
+    }
+		// If wake up phase is set up
+    else if(prevState.sunriseDurationBeforeWakeUp != this.state.sunriseDurationBeforeWakeUp) {
+      this.setScheduleTime(4); // TODO: id=4 is set hard in the code. This has to be changed in the future
+    }
+
+		// If sunrise duration is set up
+    else if(prevState.sunriseDurationMinutes != this.state.sunriseDurationMinutes) {
+      this.setRuleActionTransitiontime(5); // TODO: rule id=5 is set hard in the code. This has to be changed in the future
+    }
+  }
+
+  /**
+   * Sets the status of a specific schedule.
+   * id   id of the specific schedule which should be set up
+   */
+  setScheduleStatus(id) {
+
+    let statusToSet = this.state.scheduleIsOn ? 'enabled' : 'disabled';
+
+    /**
+     * REST call to change the status of a schedule to enabled/disabled.
+     */
+    fetch('http://192.168.0.21/api/CeyiFspaKI7cxGvtu9uOLJmQgOmAZuoUyMaxwETp/schedules/' + id, {
+      method: 'PUT',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        'status': statusToSet
+      })
+    });
+  };
+
+  /**
+   * Sets the time of a specific schedule.
+   * id   id of the specific schedule which should be set up
+   */
+  setScheduleTime(id) {
+
+    let minutes = this.state.WakeUpTimeMinutes;
+    let hours = this.state.WakeUpTimeHours;
+
+    if(minutes > this.state.sunriseDurationBeforeWakeUp) {
+      minutes = minutes - this.state.sunriseDurationBeforeWakeUp;
+    }
+    else {
+      minutes = 60 + minutes - this.state.sunriseDurationBeforeWakeUp;
+      hours == 0 ? hours = 23 : hours -= 1;
+    }
+
+    let time = "W124/T" + (hours < 10 ? "0" + hours : hours) + ":" + (minutes < 10 ? "0" + minutes : minutes) + ":00";
+    /**
+     * REST call to change the status of a schedule to enabled/disabled.
+     */
+    fetch('http://192.168.0.21/api/CeyiFspaKI7cxGvtu9uOLJmQgOmAZuoUyMaxwETp/schedules/' + id, {
+      method: 'PUT',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        'localtime': time
+      })
+    });
+  };
+
+	/**
+	 * Sets the status of a specific schedule.
+	 * id   id of the specific schedule which should be set up
+	 */
+	setRuleActionTransitiontime(id) {
+
+		let timeToSet = this.state.sunriseDurationMinutes * 600;
+
+		/**
+		 * REST call to change the transitiontime of a rules action(s).
+		 */
+		fetch('http://192.168.0.21/api/CeyiFspaKI7cxGvtu9uOLJmQgOmAZuoUyMaxwETp/rules/' + id, {
+			method: 'PUT',
+			headers: {
+				'Accept': 'application/json',
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({
+				'actions': [{
+					"address": "/groups/2/action",
+					"method": "PUT",
+					"body": {
+						"transitiontime": timeToSet,
+						"bri": 254
+					}
+				},
+				{
+					"address": "/groups/2/action",
+					"method": "PUT",
+					"body": {
+						"transitiontime": timeToSet,
+						"ct": 365
+					}
+				},
+				{
+					"address": "/sensors/7/state",
+					"method": "PUT",
+					"body": {
+						"flag": false
+					}
+				},
+				{
+					"address": "/schedules/5/",
+					"method": "PUT",
+					"body": {
+						"status": "disabled"
+					}
+				}]
+
+			})
+		});
+	};
+
+
+	/**
+	 * Renders the UI components.
+	 * Returns the same result each time it's invoked,
+	 * and it does not read from or write to the DOM
+	 * or otherwise interact with the browser (e.g., by using setTimeout).
+	 * If you need to interact with the browser,
+	 * perform your work in componentDidMount().
+	 */
+	render() {
+
+		var navigationView = (
+    	<View style={styles.containerDrawerView}>
+				<Text style={styles.textS}>Sunrise</Text>
+
+				<View style={{height: 5}}></View>
+
+				<Switch
+						onValueChange={(value) => this.setState({scheduleIsOn: value})}
+						value={this.state.scheduleIsOn} />
+
+				<View style={{height: 20}}></View>
+
+				<Text style={styles.textS}>Wake up phase (minutes)</Text>
+
+				<Picker
+						style={styles.picker}
+						selectedValue={this.state.sunriseDurationBeforeWakeUp.toString()}
+						onValueChange={(value) => this.setState({sunriseDurationBeforeWakeUp: parseInt(value)})}>
+						<Picker.Item label="0" value="0" />
+						<Picker.Item label="5" value="5" />
+						<Picker.Item label="10" value="10" />
+						<Picker.Item label="15" value="15" />
+						<Picker.Item label="20" value="20" />
+						<Picker.Item label="25" value="25" />
+						<Picker.Item label="30" value="30" />
+				</Picker>
+
+				<View style={{height: 20}}></View>
+
+				<Text style={styles.textS}>sunrise duration (minutes)</Text>
+
+				<Picker
+						style={styles.picker}
+						selectedValue={this.state.sunriseDurationMinutes.toString()}
+						onValueChange={(value) => this.setState({sunriseDurationMinutes: parseInt(value)})}>
+						<Picker.Item label="10" value="10" />
+						<Picker.Item label="30" value="30" />
+						<Picker.Item label="60" value="60" />
+				</Picker>
+    	</View>
+  	);
+
+    return (
+			<DrawerLayoutAndroid
+	      drawerWidth={200}
+	      drawerPosition={DrawerLayoutAndroid.positions.Left}
+	      renderNavigationView={() => navigationView}>
+
+				<View style={styles.containerMainView}>
+
+		    <View style={{height: 50}}></View>
+
+					<Text style={styles.textS}>Time you want to wake up</Text>
+
+					<TouchableWithoutFeedback
+						onPress={this.showPicker.bind(this, 'isoFormat', {
+						hour: this.state.WakeUpTimeHours,
+						minute: this.state.WakeUpTimeMinutes,
+						is24Hour: true,
+					})}>
+						<View>
+							<Text style={styles.textL}>{this.formatTime(this.state.WakeUpTimeHours, this.state.WakeUpTimeMinutes)}</Text>
+						</View>
+					</TouchableWithoutFeedback>
+				</View>
+			</DrawerLayoutAndroid>
+    );
+  }
+
+
+
+}
+
+
+/**
+ * Styles
+ */
+const styles = StyleSheet.create({
+	containerMainView: {
+		flex: 1,
+		justifyContent: 'center', //vertical
+		alignItems: 'center', //horizontal
+		backgroundColor: '#455055',
+	},
+	containerDrawerView: {
+		flex: 1,
+		//justifyContent: 'center', //vertical
+		alignItems: 'flex-start', //horizontal
+		backgroundColor: '#455055',
+		padding: 10,
+	},
+	textL: {
+		fontSize: 56,
+		color: '#f8f8ff',
+    textShadowColor: '#3f3f3f',
+    textShadowOffset: {width: 0, height: 6},
+    textShadowRadius: 8,
+	},
+	textM: {
+		color: '#f8f8ff',
+		fontSize: 20,
+		textAlign: 'center',
+		margin: 10,
+	},
+	textS: {
+    fontSize: 15,
+		color: '#bababf',
+	},
+  picker: {
+    width: 70,
+    color: '#f8f8ff',
   },
 });
 
