@@ -11,6 +11,7 @@ import {
  	Image,
 	View,
 	Alert,
+  Button,
 	TouchableHighlight,
 	TouchableWithoutFeedback,
 	TouchableOpacity,
@@ -33,9 +34,8 @@ class MyButton extends Component {
 
 	render() {
 		return (
-			<TouchableOpacity onPress={this.props.onPressFunction} style={this.props.style}>
-					<Image style={styles.buttonIcon} source={this.props.icon} />
-					<Text style={styles.textM}>{this.props.label}</Text>
+			<TouchableOpacity onPress={this.props.onPress} style={this.props.style}>
+					<Text style={styles.textButton}>{this.props.label}</Text>
 			</TouchableOpacity>
 		);
 	}
@@ -54,7 +54,14 @@ export default class HueWake extends Component {
 			WakeUpTimeMinutes: 5,
       scheduleIsOn: false,
       sunriseDurationBeforeWakeUp: 15,
-			sunriseDurationMinutes: 30
+			sunriseDurationMinutes: 30,
+      MondayIsActive: true,
+      TuesdayIsActive: true,
+      WednesdayIsActive: true,
+      ThursdayIsActive: true,
+      FridayIsActive: true,
+      SaturdayIsActive: false,
+      SundayIsActive: false,
 		};
   }
 
@@ -266,6 +273,24 @@ export default class HueWake extends Component {
 		});
 	};
 
+  updateWeekdays(weekday) {
+    //this.style = {styles.buttonHighlighted};
+    if(weekday == "monday") {
+      this.state.MondayIsActive ? this.setState({MondayIsActive: false}) : this.setState({MondayIsActive: true});
+    } else if (weekday == "tueday") {
+      this.state.TuesdayIsActive ? this.setState({TuesdayIsActive: false}) : this.setState({TuesdayIsActive: true});
+    } else if (weekday == "wednesday") {
+      this.state.WednesdayIsActive ? this.setState({WednesdayIsActive: false}) : this.setState({WednesdayIsActive: true});
+    } else if (weekday == "thursday") {
+      this.state.ThursdayIsActive ? this.setState({ThursdayIsActive: false}) : this.setState({ThursdayIsActive: true});
+    } else if (weekday == "friday") {
+      this.state.FridayIsActive ? this.setState({FridayIsActive: false}) : this.setState({FridayIsActive: true});
+    } else if (weekday == "saturday") {
+      this.state.SatursdayIsActive ? this.setState({SatursdayIsActive: false}) : this.setState({SatursdayIsActive: true});
+    } else if (weekday == "sunday") {
+      this.state.SundayIsActive ? this.setState({SundayIsActive: false}) : this.setState({SundayIsActive: true});
+    }
+  };
 
 	/**
 	 * Renders the UI components.
@@ -277,17 +302,27 @@ export default class HueWake extends Component {
 	 */
 	render() {
 
-		var navigationView = (
+    // Sets the button style for each button respecting it's state (active/inactive)
+    let mondayButtonStyle = this.state.MondayIsActive ? styles.buttonHighlighted : styles.button;
+    let tuesdayButtonStyle = this.state.TuesdayIsActive ? styles.buttonHighlighted : styles.button;
+    let wednesdayButtonStyle = this.state.WednesdayIsActive ? styles.buttonHighlighted : styles.button;
+    let thursdayButtonStyle = this.state.ThursdayIsActive ? styles.buttonHighlighted : styles.button;
+    let fridayButtonStyle = this.state.FridayIsActive ? styles.buttonHighlighted : styles.button;
+    let saturdayButtonStyle = this.state.SaturdayIsActive ? styles.buttonHighlighted : styles.button;
+    let sundayButtonStyle = this.state.SundayIsActive ? styles.buttonHighlighted : styles.button;
+
+    // Function for the option panel
+		let navigationView = (
     	<View style={styles.containerDrawerView}>
 				<Text style={styles.textS}>Sunrise</Text>
 
-				<View style={{height: 5}}></View>
+				<View style={{height: 10}}></View>
 
 				<Switch
 						onValueChange={(value) => this.setState({scheduleIsOn: value})}
 						value={this.state.scheduleIsOn} />
 
-				<View style={{height: 20}}></View>
+				<View style={{height: 25}}></View>
 
 				<Text style={styles.textS}>Wake up phase (minutes)</Text>
 
@@ -306,7 +341,7 @@ export default class HueWake extends Component {
 
 				<View style={{height: 20}}></View>
 
-				<Text style={styles.textS}>sunrise duration (minutes)</Text>
+				<Text style={styles.textS}>Sunrise duration (minutes)</Text>
 
 				<Picker
 						style={styles.picker}
@@ -316,10 +351,26 @@ export default class HueWake extends Component {
 						<Picker.Item label="30" value="30" />
 						<Picker.Item label="60" value="60" />
 				</Picker>
+
+        <View style={{height: 20}}></View>
+
+        <Text style={styles.textS}>Weekdays</Text>
+
+        <View style={{height: 10}}></View>
+
+          <MyButton onPress={() => this.updateWeekdays("monday")} label="Monday" style={mondayButtonStyle} />
+          <MyButton onPress={() => this.updateWeekdays("tuesday")} label="Tuesday" style={tuesdayButtonStyle} />
+          <MyButton onPress={() => this.updateWeekdays("wednesday")} label="Wednesday" style={wednesdayButtonStyle} />
+          <MyButton onPress={() => this.updateWeekdays("thursday")} label="Thursday" style={thursdayButtonStyle} />
+          <MyButton onPress={() => this.updateWeekdays("friday")} label="Friday" style={fridayButtonStyle} />
+          <MyButton onPress={() => this.updateWeekdays("saturday")} label="Saturday" style={saturdayButtonStyle} />
+          <MyButton onPress={() => this.updateWeekdays("sunday")} label="Sunday" style={sundayButtonStyle} />
+
     	</View>
   	);
 
     return (
+      // Renders the main view
 			<DrawerLayoutAndroid
 	      drawerWidth={200}
 	      drawerPosition={DrawerLayoutAndroid.positions.Left}
@@ -385,9 +436,23 @@ const styles = StyleSheet.create({
     fontSize: 15,
 		color: '#bababf',
 	},
+  textButton: {
+    fontSize: 15,
+    color: '#f8f8ff',
+    margin: 5,
+    textAlign: 'center',
+  },
   picker: {
     width: 70,
     color: '#f8f8ff',
+  },
+  buttonHighlighted: {
+    width: 170,
+    backgroundColor: '#354045',
+  },
+  button: {
+    width: 170,
+    backgroundColor: '#556065',
   },
 });
 
