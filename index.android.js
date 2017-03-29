@@ -52,14 +52,14 @@ export default class HueWake extends Component {
 	    this.state = {
 			WakeUpTimeHours: 6,
 			WakeUpTimeMinutes: 5,
-      scheduleIsOn: false,
+      scheduleIsOn: true,
       sunriseDurationBeforeWakeUp: 15,
 			sunriseDurationMinutes: 30,
-      MondayIsActive: true,
-      TuesdayIsActive: true,
-      WednesdayIsActive: true,
-      ThursdayIsActive: true,
-      FridayIsActive: true,
+      MondayIsActive: false,
+      TuesdayIsActive: false,
+      WednesdayIsActive: false,
+      ThursdayIsActive: false,
+      FridayIsActive: false,
       SaturdayIsActive: false,
       SundayIsActive: false,
 		};
@@ -79,6 +79,7 @@ export default class HueWake extends Component {
         if(responseJson.status == "enabled") {
           this.setState({scheduleIsOn: true});
         }
+        // init hours an minutes by parsing the json and setting the states
         let hours = parseInt(responseJson.localtime.substring(6,8));
         let minutes = parseInt(responseJson.localtime.substring(9,11));
         if(minutes >= 60-this.state.sunriseDurationBeforeWakeUp) {
@@ -91,6 +92,41 @@ export default class HueWake extends Component {
 
         this.setState({WakeUpTimeHours: hours});
         this.setState({WakeUpTimeMinutes: minutes});
+
+        // init weekdays by parsing the json and setting the states
+        let weekdayCount = parseInt(responseJson.localtime.substring(1,4));
+
+        // the following numbers come from the Philips Hue time format
+        // for more information see https://developers.meethue.com/documentation/datatypes-and-time-patterns
+        if(weekdayCount >= 64) {
+          this.setState({MondayIsActive: true});
+          weekdayCount -= 64;
+        }
+        if(weekdayCount >= 32) {
+          this.setState({TuesdayIsActive: true});
+          weekdayCount -= 32;
+        }
+        if(weekdayCount >= 16) {
+          this.setState({WednesdayIsActive: true});
+          weekdayCount -= 16;
+        }
+        if(weekdayCount >= 8) {
+          this.setState({ThursdayIsActive: true});
+          weekdayCount -= 8;
+        }
+        if(weekdayCount >= 4) {
+          this.setState({FridayIsActive: true});
+          weekdayCount -= 4;
+        }
+        if(weekdayCount >= 2) {
+          this.setState({SaturdayIsActive: true});
+          weekdayCount -= 2;
+        }
+        if(weekdayCount >= 1) {
+          this.setState({SundayIsActive: true});
+          weekdayCount -= 1;
+        }
+
       })
       .catch((error) => {
         console.error(error);
@@ -142,7 +178,7 @@ export default class HueWake extends Component {
 	};
 
   /**
-   * This function is called every time the state of this component (WakeUpLight) is changed
+   * This function is called every time the state of this component is changed
    */
   componentDidUpdate(prevProps, prevState) {
     // If the switch is used
@@ -157,11 +193,20 @@ export default class HueWake extends Component {
     else if(prevState.sunriseDurationBeforeWakeUp != this.state.sunriseDurationBeforeWakeUp) {
       this.setScheduleTime(4); // TODO: id=4 is set hard in the code. This has to be changed in the future
     }
-
 		// If sunrise duration is set up
     else if(prevState.sunriseDurationMinutes != this.state.sunriseDurationMinutes) {
       this.setRuleActionTransitiontime(5); // TODO: rule id=5 is set hard in the code. This has to be changed in the future
     }
+    // If one of the weekydays changed
+    else if(prevState.MondayIsActive != this.state.MondayIsActive ||
+            prevState.TuesdayIsActive != this.state.TuesdayIsActive ||
+            prevState.WednesdayIsActive != this.state.WednesdayIsActive ||
+            prevState.ThursdayIsActive != this.state.ThursdayIsActive ||
+            prevState.FridayIsActive != this.state.FridayIsActive ||
+            prevState.SaturdayIsActive != this.state.SaturdayIsActive ||
+            prevState.SundayIsActive != this.state.SundayIsActive) {
+              this.setScheduleTime(4); // TODO: id=4 is set hard in the code. This has to be changed in the future
+            }
   }
 
   /**
@@ -193,6 +238,7 @@ export default class HueWake extends Component {
    */
   setScheduleTime(id) {
 
+    // prepare minutes and hours
     let minutes = this.state.WakeUpTimeMinutes;
     let hours = this.state.WakeUpTimeHours;
 
@@ -204,7 +250,18 @@ export default class HueWake extends Component {
       hours == 0 ? hours = 23 : hours -= 1;
     }
 
-    let time = "W124/T" + (hours < 10 ? "0" + hours : hours) + ":" + (minutes < 10 ? "0" + minutes : minutes) + ":00";
+    // prepare weekdays, for more information about the Philips Hue time format see https://developers.meethue.com/documentation/datatypes-and-time-patterns
+    let weekdayCount = 0; // init an int for the weekday count in hex
+    if(this.state.MondayIsActive) { weekdayCount += 64; }
+    if(this.state.TuesdayIsActive) { weekdayCount += 32; }
+    if(this.state.WednesdayIsActive) { weekdayCount += 16; }
+    if(this.state.ThursdayIsActive) { weekdayCount += 8; }
+    if(this.state.FridayIsActive) { weekdayCount += 4; }
+    if(this.state.SaturdayIsActive) { weekdayCount += 2; }
+    if(this.state.SundayIsActive) { weekdayCount += 1; }
+
+    // set everything together to a string
+    let time = "W" + weekdayCount.toString() + "/T" + (hours < 10 ? "0" + hours : hours) + ":" + (minutes < 10 ? "0" + minutes : minutes) + ":00";
     /**
      * REST call to change the status of a schedule to enabled/disabled.
      */
@@ -221,7 +278,7 @@ export default class HueWake extends Component {
   };
 
 	/**
-	 * Sets the status of a specific schedule.
+	 * Sets the transition time of defined actions.
 	 * id   id of the specific schedule which should be set up
 	 */
 	setRuleActionTransitiontime(id) {
@@ -273,11 +330,15 @@ export default class HueWake extends Component {
 		});
 	};
 
+  /**
+   * This function is called every time a change is made for the weekday states.
+   * In this case, when a weekday button is presed.
+   * weekday   weekday state to change (from true to false or from false to true)
+   */
   updateWeekdays(weekday) {
-    //this.style = {styles.buttonHighlighted};
     if(weekday == "monday") {
       this.state.MondayIsActive ? this.setState({MondayIsActive: false}) : this.setState({MondayIsActive: true});
-    } else if (weekday == "tueday") {
+    } else if (weekday == "tuesday") {
       this.state.TuesdayIsActive ? this.setState({TuesdayIsActive: false}) : this.setState({TuesdayIsActive: true});
     } else if (weekday == "wednesday") {
       this.state.WednesdayIsActive ? this.setState({WednesdayIsActive: false}) : this.setState({WednesdayIsActive: true});
@@ -286,7 +347,7 @@ export default class HueWake extends Component {
     } else if (weekday == "friday") {
       this.state.FridayIsActive ? this.setState({FridayIsActive: false}) : this.setState({FridayIsActive: true});
     } else if (weekday == "saturday") {
-      this.state.SatursdayIsActive ? this.setState({SatursdayIsActive: false}) : this.setState({SatursdayIsActive: true});
+      this.state.SaturdayIsActive ? this.setState({SaturdayIsActive: false}) : this.setState({SaturdayIsActive: true});
     } else if (weekday == "sunday") {
       this.state.SundayIsActive ? this.setState({SundayIsActive: false}) : this.setState({SundayIsActive: true});
     }
